@@ -1,0 +1,12 @@
+const mongoose = require("mongoose");
+const express = require("express");
+const router = express.Router();
+const { createPost,deletePost,getAllPosts,updatePost,likePost,commentOnPost } = require("../Controller/Post.controller");
+const authMiddleware = require("../midlleware/authMiddleware");
+router.post("/create", createPost);
+router.get("/all", getAllPosts);
+router.delete("/delete/:postId", deletePost);
+router.put("/update/:postId", updatePost);
+router.post("/like/:postId", likePost);
+router.post("/comment/:postId", commentOnPost);
+module.exports = router;
