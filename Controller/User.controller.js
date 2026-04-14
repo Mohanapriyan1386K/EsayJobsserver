@@ -1,6 +1,6 @@
 const User = require("../model/user.model");
 
-const Post = require("../model/Post.model");
+const Post = require("../model/post.model");
 
 const bcrypt = require("bcrypt");
 
