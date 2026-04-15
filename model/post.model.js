@@ -16,7 +16,7 @@ const postSchema = new mongoose.Schema(
 
     jobtype:{
       type:String,
-      enum:["it","government","core"],
+      enum:["non-it","it",],
 
     },
 
@@ -28,6 +28,11 @@ const postSchema = new mongoose.Schema(
     image: {
       type: String,
       default: "",
+    },
+    applyType: {
+      type: String,
+      enum: ["walk-in", "online"],
+      required: true,
     },
     applyLink:{
       type:String,
@@ -46,10 +51,34 @@ const postSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    content: {
+      type: String,
+      default: "",
+      required: true,
+    },
     description: {
       type: String,
       default: "",
-      required:true,
+    },
+    details: {
+      companyName: { type: String, default: "" },
+      interviewLocation: { type: String, default: "" },
+      interviewTimings: { type: String, default: "" },
+      interviewDate: { type: String, default: "" },
+      jobRole: { type: String, default: "" },
+      salaryInfo: { type: String, default: "" },
+      graduation: { type: String, default: "" },
+      yearOfPassout: { type: String, default: "" },
+      vacancy: { type: String, default: "" },
+      shift: { type: String, default: "" },
+      shiftTimings: { type: String, default: "" },
+      weeklyOff: { type: String, default: "" },
+      note: { type: String, default: "" },
+      bondAndAgreement: { type: String, default: "" },
+      hrName: { type: String, default: "" },
+      hrNumber: { type: String, default: "" },
+      rounds: { type: String, default: "" },
+      walkInInfo: { type: String, default: "" },
     },
 
     // Social features

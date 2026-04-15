@@ -1,6 +1,72 @@
 const Post = require("../model/post.model");
 const User = require("../model/user.model");
-const mongoose=require("mongoose")
+const mongoose = require("mongoose");
+
+const normalizeApplyType = (value) => {
+  if (!value) return value;
+  const v = String(value).trim().toLowerCase();
+
+  if (v === "walkin" || v === "walk-in" || v === "walk in") return "walk-in";
+  if (v === "online") return "online";
+  return v;
+};
+
+const mapPostPayload = (payload = {}, partial = false) => {
+  const mapped = {};
+
+  if (!partial || payload.userId !== undefined) mapped.userId = payload.userId;
+  if (!partial || payload.jobtype !== undefined || payload.type !== undefined) {
+    mapped.jobtype = payload.jobtype || payload.type;
+  }
+  if (!partial || payload.title !== undefined) mapped.title = payload.title;
+  if (!partial || payload.image !== undefined) mapped.image = payload.image;
+  if (!partial || payload.company !== undefined) mapped.company = payload.company;
+  if (!partial || payload.salary !== undefined) mapped.salary = payload.salary;
+  if (!partial || payload.location !== undefined) mapped.location = payload.location;
+  if (!partial || payload.applyLink !== undefined) mapped.applyLink = payload.applyLink;
+  if (!partial || payload.applyType !== undefined || payload.applyMode !== undefined) {
+    mapped.applyType = normalizeApplyType(payload.applyType || payload.applyMode);
+  }
+
+  if (!partial || payload.details !== undefined) mapped.details = payload.details || {};
+
+  if (!partial || payload.content !== undefined || payload.description !== undefined) {
+    const content = payload.content || payload.description || "";
+    mapped.content = content;
+    mapped.description = content;
+  }
+
+  return mapped;
+};
+
+const getRequiredFields = (postData) => {
+  const requiredFields = [
+    "userId",
+    "jobtype",
+    "title",
+    "company",
+    "salary",
+    "location",
+    "applyType",
+    "content",
+  ];
+
+  return requiredFields.filter((field) => !postData[field]);
+};
+
+const getApplyTypeValidationError = (postData) => {
+  if (!postData.applyType) return null;
+
+  if (!["walk-in", "online"].includes(postData.applyType)) {
+    return "applyType must be either 'walk-in' or 'online'";
+  }
+
+  if (postData.applyType === "online" && !postData.applyLink) {
+    return "applyLink is required when applyType is 'online'";
+  }
+
+  return null;
+};
 
 const createPost = async (req, res) => {
   try {
@@ -11,23 +77,21 @@ const createPost = async (req, res) => {
     }
 
     if (Array.isArray(req.body)) {
-      const posts = req.body;
+      const posts = req.body.map((post) => mapPostPayload(post));
 
-      const invalidPost = posts.find(
-        (p) =>
-          !p.userId ||
-          !p.type ||
-          !p.title ||
-          !p.company ||
-          !p.salary ||
-          !p.location ||
-          !p.description||
-          !p.applyLink
-      );
+      const invalidPost = posts.find((post) => getRequiredFields(post).length > 0);
 
       if (invalidPost) {
         return res.status(422).json({
-          message: "All fields are required in each post",
+          message: "Missing required fields in one or more posts",
+          missingFields: getRequiredFields(invalidPost),
+        });
+      }
+
+      const applyTypeErrorPost = posts.find((post) => getApplyTypeValidationError(post));
+      if (applyTypeErrorPost) {
+        return res.status(422).json({
+          message: getApplyTypeValidationError(applyTypeErrorPost),
         });
       }
 
@@ -40,44 +104,22 @@ const createPost = async (req, res) => {
       });
     }
 
-    const {
-      userId,
-      jobtype,
-      title,
-      image,
-      company,
-      salary,
-      location,
-      description,
-      applyLink
-    } = req.body;
+    const postData = mapPostPayload(req.body);
+    const missingFields = getRequiredFields(postData);
 
-    if (
-      !userId ||
-      !jobtype ||
-      !title ||
-      !company ||
-      !salary ||
-      !location ||
-      !description||
-      !applyLink
-    ) {
+    if (missingFields.length > 0) {
       return res.status(422).json({
-        message: "All fields are required",
+        message: "Missing required fields",
+        missingFields,
       });
     }
 
-    const newPost = new Post({
-      userId,
-      jobtype,
-      title,
-      image,
-      company,
-      salary,
-      location,
-      description,
-      applyLink,
-    });
+    const applyTypeError = getApplyTypeValidationError(postData);
+    if (applyTypeError) {
+      return res.status(422).json({ message: applyTypeError });
+    }
+
+    const newPost = new Post(postData);
 
     await newPost.save();
 
@@ -101,6 +143,8 @@ const getAllPosts = async (req, res) => {
       title,
       company,
       type,
+      jobtype,
+      applyType,
       fromDate,
       toDate,
       userId,
@@ -120,13 +164,17 @@ const getAllPosts = async (req, res) => {
     }
 
     // Type filter
-    if (type) {
-      query.type = type;
+    if (jobtype || type) {
+      query.jobtype = jobtype || type;
     }
 
     // Company filter
     if (company) {
       query.company = { $regex: company, $options: "i" };
+    }
+
+    if (applyType) {
+      query.applyType = normalizeApplyType(applyType);
     }
 
     if (userId && mongoose.Types.ObjectId.isValid(userId)) {
@@ -206,27 +254,74 @@ const updatePost = async (req, res) => {
     }
 
     const { postId } = req.params;
+    const existingPost = await Post.findById(postId);
+
+    if (!existingPost) {
+      return res.status(404).json({ message: "Post Not Found" });
+    }
+
     const {
       userId,
       jobtype,
       title,
       content,
+      description,
       image,
       company,
       salary,
       location,
-      comments,
       applyLink,
+      applyType,
+      details,
     } = req.body;
-    console.log(userId, comments);
+
+    const mappedData = mapPostPayload({
+      userId,
+      jobtype,
+      title,
+      content,
+      description,
+      image,
+      company,
+      salary,
+      location,
+      applyLink,
+      applyType,
+      details,
+      applyMode: req.body.applyMode,
+      type: req.body.type,
+    }, true);
+
+    const updateData = {};
+
+    Object.keys(mappedData).forEach((key) => {
+      if (mappedData[key] !== undefined) {
+        updateData[key] = mappedData[key];
+      }
+    });
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        message: "No valid fields provided to update",
+      });
+    }
+
+    const mergedForValidation = {
+      ...existingPost.toObject(),
+      ...updateData,
+    };
+
+    const applyTypeError = getApplyTypeValidationError(mergedForValidation);
+    if (applyTypeError) {
+      return res.status(422).json({ message: applyTypeError });
+    }
+
     const updatedPost = await Post.findByIdAndUpdate(
       postId,
-      { userId, title, content, image, jobtype,company, salary, location, comments,applyLink},
-      { new: true },
+      updateData,
+      { new: true, runValidators: true },
     );
-    if (!updatedPost) {
-      return res.status(404).json({ message: "Post Not Found" });
-    }
+
     res.status(200).json({
       message: "Post Updated Successfully",
       post: updatedPost,
