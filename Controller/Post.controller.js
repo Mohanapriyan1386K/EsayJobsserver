@@ -8,6 +8,7 @@ const normalizeApplyType = (value) => {
 
   if (v === "walkin" || v === "walk-in" || v === "walk in") return "walk-in";
   if (v === "online") return "online";
+  if(v=="email") return "email"
   return v;
 };
 
