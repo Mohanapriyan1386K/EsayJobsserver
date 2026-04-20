@@ -4,11 +4,11 @@ const mongoose = require("mongoose");
 
 const normalizeApplyType = (value) => {
   if (!value) return value;
-  const v = String(value).trim().toLowerCase();
+  const rawValue = typeof value === "object" ? (value.value || value.label) : value;
+  const v = String(rawValue).trim().toLowerCase();
 
-  if (v === "walkin" || v === "walk-in" || v === "walk in") return "walk-in";
-  if (v === "online") return "online";
-  if(v=="email") return "email"
+  if (["walkin", "walk-in", "walk in", "walk_in", "offline"].includes(v)) return "walk-in";
+  if (["online", "apply online", "email", "mail", "e-mail", "apply email"].includes(v)) return "online";
   return v;
 };
 
@@ -26,8 +26,13 @@ const mapPostPayload = (payload = {}, partial = false) => {
   if (!partial || payload.location !== undefined) mapped.location = payload.location;
   if (!partial || payload.applyLink !== undefined) mapped.applyLink = payload.applyLink;
   if (!partial || payload.applyEmail !== undefined) mapped.applyEmail = payload.applyEmail;
-  if (!partial || payload.applyType !== undefined || payload.applyMode !== undefined) {
-    mapped.applyType = normalizeApplyType(payload.applyType || payload.applyMode);
+  if (
+    !partial ||
+    payload.applyType !== undefined ||
+    payload.applyMode !== undefined ||
+    payload.applytype !== undefined
+  ) {
+    mapped.applyType = normalizeApplyType(payload.applyType || payload.applyMode || payload.applytype);
   }
 
   if (!partial || payload.details !== undefined) mapped.details = payload.details || {};
