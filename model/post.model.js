@@ -31,11 +31,17 @@ const postSchema = new mongoose.Schema(
     },
     applyType: {
       type: String,
-      enum: ["walk-in", "online"],
+      enum: ["walk-in", "online","email"],
       required: true,
     },
     applyLink:{
       type:String,
+    },
+    applyEmail: {
+      type: String,
+      default: "",
+      trim: true,
+      lowercase: true,
     },
 
     // Job-specific fields

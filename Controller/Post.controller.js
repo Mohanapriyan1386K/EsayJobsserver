@@ -24,6 +24,7 @@ const mapPostPayload = (payload = {}, partial = false) => {
   if (!partial || payload.salary !== undefined) mapped.salary = payload.salary;
   if (!partial || payload.location !== undefined) mapped.location = payload.location;
   if (!partial || payload.applyLink !== undefined) mapped.applyLink = payload.applyLink;
+  if (!partial || payload.applyEmail !== undefined) mapped.applyEmail = payload.applyEmail;
   if (!partial || payload.applyType !== undefined || payload.applyMode !== undefined) {
     mapped.applyType = normalizeApplyType(payload.applyType || payload.applyMode);
   }
@@ -61,8 +62,15 @@ const getApplyTypeValidationError = (postData) => {
     return "applyType must be either 'walk-in' or 'online'";
   }
 
-  if (postData.applyType === "online" && !postData.applyLink) {
-    return "applyLink is required when applyType is 'online'";
+  if (postData.applyType === "online" && !postData.applyLink && !postData.applyEmail) {
+    return "Either applyLink or applyEmail is required when applyType is 'online'";
+  }
+
+  if (postData.applyEmail) {
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(postData.applyEmail);
+    if (!isValidEmail) {
+      return "applyEmail must be a valid email address";
+    }
   }
 
   return null;
@@ -271,6 +279,7 @@ const updatePost = async (req, res) => {
       salary,
       location,
       applyLink,
+      applyEmail,
       applyType,
       details,
     } = req.body;
@@ -286,6 +295,7 @@ const updatePost = async (req, res) => {
       salary,
       location,
       applyLink,
+      applyEmail,
       applyType,
       details,
       applyMode: req.body.applyMode,
@@ -378,11 +388,11 @@ const commentOnPost = async (req, res) => {
 const toggleLike = async (req, res) => {
   try {
     const { postId } = req.params;
-    const { userId } = req.body;
+    const { userId, email } = req.body;
 
-    if (!postId || !userId) {
+    if (!postId || (!userId && !email)) {
       return res.status(400).json({
-        message: "PostId and UserId are required",
+        message: "PostId and either userId or email are required",
       });
     }
 
@@ -394,12 +404,26 @@ const toggleLike = async (req, res) => {
       });
     }
 
-    const isLiked = post.likes.includes(userId);
+    let finalUserId = userId;
+
+    if (!finalUserId && email) {
+      const findUser = await User.findOne({ email: String(email).trim().toLowerCase() });
+      if (!findUser) {
+        return res.status(404).json({ message: "User not found for this email" });
+      }
+      finalUserId = findUser._id.toString();
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(finalUserId)) {
+      return res.status(400).json({ message: "Invalid userId" });
+    }
+
+    const isLiked = post.likes.some((id) => id.toString() === finalUserId);
 
     if (isLiked) {
-      post.likes = post.likes.filter((id) => id.toString() !== userId);
+      post.likes = post.likes.filter((id) => id.toString() !== finalUserId);
     } else {
-      post.likes.push(userId);
+      post.likes.push(finalUserId);
     }
 
     await post.save();
