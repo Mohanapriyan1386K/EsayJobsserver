@@ -55,7 +55,13 @@ const createUser = async (req, res) => {
 
     await newUser.save();
 
-   const verifyLink = `${process.env.VITE_FRONTEND_URL}/verify-email?token=${verificationToken}`;
+    const frontendUrl = (
+      process.env.FRONTEND_URL ||
+      process.env.VITE_FRONTEND_URL ||
+      "http://localhost:5173"
+    ).replace(/\/+$/, "");
+
+    const verifyLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
     await resend.emails.send({
       from: "onboarding@resend.dev",
       to: email,
