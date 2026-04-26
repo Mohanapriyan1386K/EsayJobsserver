@@ -6,14 +6,32 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+
     email: {
       type: String,
-      required: true,
       unique: true,
+      required: true,
     },
+
     password: {
       type: String,
-      required: true,
+    },
+
+    // 🔐 Email verification
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    verificationToken: {
+      type: String,
+    },
+
+    verificationTokenExpiry: {
+      type: Date,
+    },
+    googleId: {
+      type: String,
     },
   },
   { timestamps: true }
