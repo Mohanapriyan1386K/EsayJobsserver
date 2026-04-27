@@ -88,9 +88,7 @@ const createUser = async (req, res) => {
     await newUser.save();
 
     const frontendUrl = (
-      process.env.FRONTEND_URL ||
-      process.env.VITE_FRONTEND_URL ||
-      "http://localhost:5173"
+      process.env.VITE_FRONTEND_URL
     ).replace(/\/+$/, "");
 
     const verifyLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
@@ -144,6 +142,39 @@ const verifyEmail = async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false });
   }
+};
+
+
+const resendVerification = async (req, res) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  if (user.isVerified) {
+    return res.status(400).json({ message: "Already verified" });
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+
+  user.verificationToken = token;
+  user.verificationTokenExpiry = Date.now() + 3600000;
+
+  await user.save();
+
+  const verifyLink = `${process.env.VITE_FRONTEND_URL}/verify-email?token=${token}`;
+
+  await resend.emails.send({
+    from: "onboarding@resend.dev",
+    to: email,
+    subject: "Resend Verification",
+    html: `<a href="${verifyLink}">Verify Email</a>`,
+  });
+
+  res.json({ message: "Verification resent" });
 };
 
 // Get all users
@@ -201,5 +232,6 @@ module.exports = {
   getAllUsers,
   getUserPosts,
   deleteUser,
-  verifyEmail
+  verifyEmail,
+  resendVerification
 };
