@@ -8,6 +8,34 @@ const crypto = require("crypto");
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+const makeUsernameBase = (name, email) => {
+  const nameBase = String(name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+
+  if (nameBase) return nameBase;
+
+  return String(email || "")
+    .split("@")[0]
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "") || "user";
+};
+
+const generateUniqueUsername = async (name, email) => {
+  const base = makeUsernameBase(name, email);
+  let candidate = base;
+  let suffix = 0;
+
+  while (await User.exists({ user_name: candidate })) {
+    suffix += 1;
+    candidate = `${base}${suffix}`;
+  }
+
+  return candidate;
+};
+
 const createUser = async (req, res) => {
   if (!req.body) {
     return res.status(400).json({
@@ -16,7 +44,9 @@ const createUser = async (req, res) => {
   }
 
   try {
-    const { name, email, password } = req.body;
+    const name = String(req.body.name || "").trim();
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const password = String(req.body.password || "");
 
     const missingfiled = !name
       ? "Name"
@@ -43,10 +73,12 @@ const createUser = async (req, res) => {
     const hashPassword = await bcrypt.hash(password, 10);
     const verificationToken = crypto.randomBytes(32).toString("hex");
     const verificationTokenExpiry = Date.now() + 3600000; // 1 hour
+    const user_name = await generateUniqueUsername(name, email);
 
     const newUser = new User({
       name,
       email,
+      user_name,
       password: hashPassword,
       isVerified: false,
       verificationToken,
@@ -78,6 +110,13 @@ const createUser = async (req, res) => {
     });
 
   } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({
+        message: "User already exists",
+        error: error.message,
+      });
+    }
+
     res.status(500).json({
       message: "Internal Server Error",
       error: error.message,
