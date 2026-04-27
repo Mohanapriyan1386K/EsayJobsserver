@@ -3,10 +3,9 @@ const User = require("../model/user.model");
 const Post = require("../model/post.model");
 
 const bcrypt = require("bcrypt");
-const {Resend} =require("resend");
 const crypto = require("crypto");
+const { sendVerificationMail } = require("../lib/nodemailer");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 const makeUsernameBase = (name, email) => {
   const nameBase = String(name || "")
@@ -87,21 +86,7 @@ const createUser = async (req, res) => {
 
     await newUser.save();
 
-    const frontendUrl = (
-      process.env.VITE_FRONTEND_URL
-    ).replace(/\/+$/, "");
-
-    const verifyLink = `${frontendUrl}/verify-email?token=${verificationToken}`;
-    await resend.emails.send({
-      from: "onboarding@resend.dev",
-      to: email,
-      subject: "Verify Your Email",
-      html: `
-        <h2>Email Verification</h2>
-        <p>Click below to verify your account:</p>
-        <a href="${verifyLink}">Verify Email</a>
-      `,
-    });
+    await sendVerificationMail(email, verificationToken, "Verify Your Email");
 
     res.status(201).json({
       message: "User created. Please verify your email.",
@@ -165,14 +150,7 @@ const resendVerification = async (req, res) => {
 
   await user.save();
 
-  const verifyLink = `${process.env.VITE_FRONTEND_URL}/verify-email?token=${token}`;
-
-  await resend.emails.send({
-    from: "onboarding@resend.dev",
-    to: email,
-    subject: "Resend Verification",
-    html: `<a href="${verifyLink}">Verify Email</a>`,
-  });
+  await sendVerificationMail(email, token, "Resend Verification");
 
   res.json({ message: "Verification resent" });
 };
